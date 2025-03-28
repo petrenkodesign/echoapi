@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Echo API</title>
+</head>
+<body>
+    <h1>Echo API WebSocket</h1>
+    <p id="log">Waiting for messages...</p>
+
+    <script>
+        const socket = new WebSocket('ws://localhost:3000');
+
+        socket.onmessage = (event) => {
+            document.getElementById("log").innerHTML += `<br>${event.data}`;
+        };
+    </script>
+</body>
+</html>
+
