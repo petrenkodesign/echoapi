@@ -7,6 +7,7 @@ const server = http.createServer(app);
 const io = socketIo(server);
 
 app.use(express.json());
+app.use(express.static(__dirname + '/public'));
 
 // API echo
 app.post('/echo', (req, res) => {

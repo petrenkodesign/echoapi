@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Test</title>
+</head>
+<body>
+    <h1>Echo Client (server test)</h1>
+    <button onclick="sendEcho()">Send Echo</button>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        socket.on('new_request', (data) => {
+            console.log('Received from server:', data);
+        });
+
+        function sendEcho() {
+            fetch('/echo', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: 'Hello, Server!' })
+            })
+            .then(res => res.json())
+            .then(data => console.log('Response:', data));
+        }
+    </script>
+</body>
+</html>
+
