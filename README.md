@@ -4,10 +4,10 @@ Api for catching app`s calling
 
 ## Getting Started 
 
-''git clone https://github.com/petrenkodesign/echoapi.git'' 
+```git clone https://github.com/petrenkodesign/echoapi.git``` 
 
-''cd echoapi'' 
+```cd echoapi``` 
 
-''npm init -y'' 
+```npm init -y``` 
 
-''node server.js''
+```node server.js```
