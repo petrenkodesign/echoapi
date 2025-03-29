@@ -8,6 +8,6 @@ Api for catching app`s calling
 
 ```cd echoapi``` 
 
-```npm init -y``` 
+```npm install``` 
 
 ```node server.js```
