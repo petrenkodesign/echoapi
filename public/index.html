@@ -197,6 +197,37 @@
         let isSocketConnected = false;
         let isDbConnected = false;
 
+        let map;
+        const colors = ['#FF0000', '#00FF00', '#0000FF', '#FF00FF', '#00FFFF', '#FFFF00'];
+        let colorIndex = 0;
+        const userColors = {};
+
+        function initMap() {
+            map = L.map('map').setView([50.3872275, 30.6053134], 13);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+        }
+
+        function groupByTrack(data) {
+            return data.reduce((acc, point) => {
+                const track = point.track || point.timestamp.split('.')[0];
+                if (!acc[track]) {
+                    acc[track] = [];
+                }
+                acc[track].push(point);
+                return acc;
+            }, {});
+        }
+
+        function getUserColor(username) {
+            if (!userColors[username]) {
+                userColors[username] = colors[colorIndex % colors.length];
+                colorIndex++;
+            }
+            return userColors[username];
+        }
+
         function updateConnectionStatus() {
             const statusElement = document.querySelector('.online-status span');
             if (isSocketConnected && isDbConnected) {
