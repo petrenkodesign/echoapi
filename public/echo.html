@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Echo API</title>
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+    <h1>Echo API WebSocket</h1>
+    <p id="log"><b><u>Waiting for messages...</u></b></p>
+
+    <script>
+        const socket = io();
+        
+        socket.on('new_request', (data) => {
+            console.log('Received from server:', data);
+            document.getElementById("log").innerHTML += `<br>Received from client: ` + JSON.stringify(data, null, 2);
+        });
+    </script>
+</body>
+</html>
+

@@ -1,21 +1,165 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Echo API</title>
-    <script src="/socket.io/socket.io.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RunTracker - Tracks</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <style>
+        #map {
+            height: 600px;
+            display: none;
+        }
+        .track-list {
+            margin: 20px;
+        }
+        .sos-alert {
+            color: red;
+            font-weight: bold;
+        }
+    </style>
 </head>
 <body>
-    <h1>Echo API WebSocket</h1>
-    <p id="log"><b><u>Waiting for messages...</u></b></p>
+    <div class="track-list">
+        <h2>Tracks</h2>
+        <div id="tracks"></div>
+    </div>
+    <div id="map"></div>
 
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
-        
-        socket.on('new_request', (data) => {
-            console.log('Received from server:', data);
-            document.getElementById("log").innerHTML += `<br>Received from client: ` + JSON.stringify(data, null, 2);
+        let map;
+        let tracks = {};
+        const colors = ['#FF0000', '#00FF00', '#0000FF', '#FF00FF', '#00FFFF', '#FFFF00'];
+        let colorIndex = 0;
+        const userColors = {};
+
+        // Initialize map
+        function initMap() {
+            map = L.map('map').setView([50.3872275, 30.6053134], 13);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+        }
+
+        // Fetch and display tracks
+        async function fetchTracks() {
+            const response = await fetch('/tracks');
+            const data = await response.json();
+
+            const tracksDiv = document.getElementById('tracks');
+            tracksDiv.innerHTML = '';
+
+            const trackGroups = groupByTrack(data);
+
+            Object.entries(trackGroups)
+                .sort(([a], [b]) => new Date(b) - new Date(a))
+                .forEach(([track, points]) => {
+                    const trackDiv = document.createElement('div');
+                    const hasSOS = points.some(p => p.sos);
+
+                    trackDiv.innerHTML = `
+                        <h3>
+                            <a href="#" onclick="showMap('${track}'); return false;">
+                                ${new Date(track).toLocaleString()}
+                            </a>
+                            ${hasSOS ? '<span class="sos-alert">SOS!</span>' : ''}
+                        </h3>
+                        <p>Participants: ${[...new Set(points.map(p => p.username.trim()))].join(', ')}</p>
+                    `;
+                    tracksDiv.appendChild(trackDiv);
+                });
+        }
+
+        function groupByTrack(data) {
+            return data.reduce((acc, point) => {
+                const track = point.track || point.timestamp.split('.')[0];
+                if (!acc[track]) {
+                    acc[track] = [];
+                }
+                acc[track].push(point);
+                return acc;
+            }, {});
+        }
+
+        function getUserColor(username) {
+            if (!userColors[username]) {
+                userColors[username] = colors[colorIndex % colors.length];
+                colorIndex++;
+            }
+            return userColors[username];
+        }
+
+        async function showMap(trackTime) {
+            const response = await fetch(`/track/${encodeURIComponent(trackTime)}`);
+            const points = await response.json();
+
+            document.getElementById('map').style.display = 'block';
+            if (!map) {
+                initMap();
+            }
+            map.eachLayer((layer) => {
+                if (layer instanceof L.Marker || layer instanceof L.Polyline) {
+                    map.removeLayer(layer);
+                }
+            });
+
+            const userGroups = {};
+            points.forEach(point => {
+                const username = point.username.trim();
+                if (!userGroups[username]) {
+                    userGroups[username] = [];
+                }
+                userGroups[username].push(point);
+            });
+
+            Object.entries(userGroups).forEach(([username, userPoints]) => {
+                const color = getUserColor(username);
+
+                // Draw route
+                const coordinates = userPoints.map(p => [p.latitude, p.longitude]);
+                const path = L.polyline(coordinates, {
+                    color: color,
+                    weight: 3
+                }).addTo(map);
+
+                // Add user label
+                const midPoint = coordinates[Math.floor(coordinates.length / 2)];
+                L.marker(midPoint, {
+                    icon: L.divIcon({
+                        html: `<div style="background-color: ${color}; padding: 5px;">${username}</div>`,
+                        className: 'user-label'
+                    })
+                }).addTo(map);
+
+                // Add points
+                userPoints.forEach(point => {
+                    const marker = L.marker([point.latitude, point.longitude])
+                        .bindPopup(`
+                            <b>${username}</b><br>
+                            Lat: ${point.latitude}<br>
+                            Lng: ${point.longitude}<br>
+                            Time: ${new Date(point.timestamp).toLocaleString()}
+                            ${point.sos ? '<br><span class="sos-alert">SOS!</span>' : ''}
+                        `)
+                        .addTo(map);
+                });
+            });
+
+            // Fit map to show all points
+            const allPoints = points.map(p => [p.latitude, p.longitude]);
+            map.fitBounds(L.latLngBounds(allPoints));
+        }
+
+        // Initialize
+        fetchTracks();
+
+        // Listen for new data
+        socket.on('new_runner', (data) => {
+            fetchTracks();
         });
     </script>
 </body>
 </html>
-
