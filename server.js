@@ -176,6 +176,17 @@ app.delete('/admin/track/:trackId', async (req, res) => {
     }
 });
 
+// Додати новий endpoint
+app.post('/admin/clear-data', async (req, res) => {
+    try {
+        await db.collection('runners').deleteMany({});
+        io.emit('data_updated');
+        res.json({ success: true, message: 'All data cleared' });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to clear data' });
+    }
+});
+
 // WebSocket підключення
 io.on('connection', (socket) => {
   console.log('Client connected');
