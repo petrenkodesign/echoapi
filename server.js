@@ -105,6 +105,77 @@ app.get('/track/:timestamp', async (req, res) => {
   }
 });
 
+// Add new admin endpoints
+
+// Get all tracks with count
+app.get('/admin/tracks', async (req, res) => {
+    try {
+        const tracks = await db.collection('runners').aggregate([
+            {
+                $group: {
+                    _id: '$track',
+                    count: { $sum: 1 }
+                }
+            },
+            { $sort: { _id: -1 } }
+        ]).toArray();
+        res.json(tracks);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch tracks' });
+    }
+});
+
+// Get all unique users
+app.get('/admin/users', async (req, res) => {
+    try {
+        const users = await db.collection('runners').distinct('username');
+        res.json(users);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch users' });
+    }
+});
+
+// Update track
+app.put('/admin/track', async (req, res) => {
+    try {
+        const { oldValue, newValue } = req.body;
+        await db.collection('runners').updateMany(
+            { track: oldValue },
+            { $set: { track: newValue } }
+        );
+        io.emit('data_updated');
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to update track' });
+    }
+});
+
+// Update user
+app.put('/admin/user', async (req, res) => {
+    try {
+        const { oldValue, newValue } = req.body;
+        await db.collection('runners').updateMany(
+            { username: oldValue },
+            { $set: { username: newValue } }
+        );
+        io.emit('data_updated');
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to update user' });
+    }
+});
+
+// Delete track
+app.delete('/admin/track/:trackId', async (req, res) => {
+    try {
+        await db.collection('runners').deleteMany({ track: req.params.trackId });
+        io.emit('data_updated');
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to delete track' });
+    }
+});
+
 // WebSocket підключення
 io.on('connection', (socket) => {
   console.log('Client connected');
