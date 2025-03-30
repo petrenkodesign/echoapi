@@ -17,6 +17,21 @@
             color: red;
             font-weight: bold;
         }
+        .db-status {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .db-connected {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .db-disconnected {
+            background-color: #f44336;
+            color: white;
+        }
     </style>
 </head>
 <body>
@@ -24,6 +39,7 @@
         <h2>Tracks</h2>
         <div id="tracks"></div>
     </div>
+    <div id="dbStatus" class="db-status"></div>
     <div id="map"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -46,31 +62,47 @@
 
         // Fetch and display tracks
         async function fetchTracks() {
-            const response = await fetch('/tracks');
-            const data = await response.json();
+            const isConnected = await checkDbConnection();
+            if (!isConnected) {
+                const tracksDiv = document.getElementById('tracks');
+                tracksDiv.innerHTML = '<p>Cannot fetch tracks: Database not connected</p>';
+                return;
+            }
 
-            const tracksDiv = document.getElementById('tracks');
-            tracksDiv.innerHTML = '';
+            try {
+                const response = await fetch('/tracks');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
 
-            const trackGroups = groupByTrack(data);
+                const tracksDiv = document.getElementById('tracks');
+                tracksDiv.innerHTML = '';
 
-            Object.entries(trackGroups)
-                .sort(([a], [b]) => new Date(b) - new Date(a))
-                .forEach(([track, points]) => {
-                    const trackDiv = document.createElement('div');
-                    const hasSOS = points.some(p => p.sos);
+                const trackGroups = groupByTrack(data);
 
-                    trackDiv.innerHTML = `
-                        <h3>
-                            <a href="#" onclick="showMap('${track}'); return false;">
-                                ${new Date(track).toLocaleString()}
-                            </a>
-                            ${hasSOS ? '<span class="sos-alert">SOS!</span>' : ''}
-                        </h3>
-                        <p>Participants: ${[...new Set(points.map(p => p.username.trim()))].join(', ')}</p>
-                    `;
-                    tracksDiv.appendChild(trackDiv);
-                });
+                Object.entries(trackGroups)
+                    .sort(([a], [b]) => new Date(b) - new Date(a))
+                    .forEach(([track, points]) => {
+                        const trackDiv = document.createElement('div');
+                        const hasSOS = points.some(p => p.sos);
+
+                        trackDiv.innerHTML = `
+                            <h3>
+                                <a href="#" onclick="showMap('${track}'); return false;">
+                                    ${new Date(track).toLocaleString()}
+                                </a>
+                                ${hasSOS ? '<span class="sos-alert">SOS!</span>' : ''}
+                            </h3>
+                            <p>Participants: ${[...new Set(points.map(p => p.username.trim()))].join(', ')}</p>
+                        `;
+                        tracksDiv.appendChild(trackDiv);
+                    });
+            } catch (error) {
+                console.error('Error fetching tracks:', error);
+                const tracksDiv = document.getElementById('tracks');
+                tracksDiv.innerHTML = '<p>Error loading tracks. Please try again later.</p>';
+            }
         }
 
         function groupByTrack(data) {
@@ -153,8 +185,35 @@
             map.fitBounds(L.latLngBounds(allPoints));
         }
 
-        // Initialize
-        fetchTracks();
+        async function checkDbConnection() {
+            try {
+                const response = await fetch('/db-status');
+                const status = await response.json();
+                const dbStatus = document.getElementById('dbStatus');
+
+                if (status.connected) {
+                    dbStatus.textContent = 'Database Connected';
+                    dbStatus.className = 'db-status db-connected';
+                    return true;
+                } else {
+                    dbStatus.textContent = 'Database Disconnected';
+                    dbStatus.className = 'db-status db-disconnected';
+                    return false;
+                }
+            } catch (error) {
+                console.error('Error checking DB status:', error);
+                return false;
+            }
+        }
+
+        // Add periodic connection check
+        setInterval(checkDbConnection, 5000);
+
+        // Initialize with connection check
+        document.addEventListener('DOMContentLoaded', () => {
+            checkDbConnection();
+            fetchTracks();
+        });
 
         // Listen for new data
         socket.on('new_runner', (data) => {

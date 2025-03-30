@@ -12,13 +12,30 @@ const mongoUrl = 'mongodb://localhost:27017';
 const dbName = 'runners';
 let db;
 
+// Add connection state variable
+let isDbConnected = false;
+
 // Connect to MongoDB
 MongoClient.connect(mongoUrl)
   .then(client => {
     console.log('Connected to MongoDB');
     db = client.db(dbName);
+    isDbConnected = true;
+
+    // Add connection monitoring
+    client.on('close', () => {
+      console.log('MongoDB connection closed');
+      isDbConnected = false;
+    });
+    client.on('reconnect', () => {
+      console.log('MongoDB reconnected');
+      isDbConnected = true;
+    });
   })
-  .catch(err => console.error('MongoDB connection error:', err));
+  .catch(err => {
+    console.error('MongoDB connection error:', err);
+    isDbConnected = false;
+  });
 
 app.use(express.json());
 app.use(express.static(__dirname + '/public'));
@@ -50,8 +67,16 @@ app.post('/call', async (req, res) => {
   }
 });
 
+// Add DB status endpoint
+app.get('/db-status', (req, res) => {
+  res.json({ connected: isDbConnected });
+});
+
 // Get all tracks
 app.get('/tracks', async (req, res) => {
+  if (!isDbConnected) {
+    return res.status(503).json({ error: 'Database not connected' });
+  }
   try {
     const tracks = await db.collection('runners').find({}).toArray();
     res.json(tracks);
