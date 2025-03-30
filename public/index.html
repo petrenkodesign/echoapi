@@ -3,80 +3,251 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RunTracker - Tracks</title>
+    <title>Runner - Live Tracking</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <style>
-        #map {
-            height: 600px;
-            display: none;
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
-        .track-list {
-            margin: 20px;
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
-        .sos-alert {
-            color: red;
-            font-weight: bold;
-        }
-        .db-status {
+
+        .header {
+            display: grid;
+            grid-template-columns: 100px 1fr 100px;
+            align-items: center;
+            padding: 0 1rem 2rem;
+            background: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            height: 80px;
             position: fixed;
-            top: 10px;
-            right: 10px;
-            padding: 10px;
-            border-radius: 5px;
+            width: 100%;
+            top: 0;
+            z-index: 1000;
         }
-        .db-connected {
-            background-color: #4CAF50;
-            color: white;
+
+        .logo-container {
+            display: flex;
+            align-items: center;
         }
-        .db-disconnected {
-            background-color: #f44336;
+
+        .logo {
+            height: 72px; /* Increased by 20% from 60px */
+        }
+
+        .brand-container {
+            text-align: center;
+            flex-grow: 1;
+        }
+
+        .brand {
+            font-size: 1.875rem; /* Decreased by 50% from 3.75rem */
+            font-weight: 300;
+            color: #333;
+            text-decoration: underline;
+            text-transform: uppercase;
+        }
+
+        .online-status {
+            font-size: 0.9rem;
+            margin-top: 0.2rem;
+            text-align: center;
+        }
+
+        .menu-icon {
+            font-size: 2rem;
+            color: #333;
+            cursor: pointer;
+            justify-self: end;
+        }
+
+        .content {
+            display: flex;
+            margin-top: 80px;
+            height: calc(100vh - 80px);
+        }
+
+        .sidebar {
+            width: 20%;
+            background: #f5f5f5;
+            overflow-y: auto;
+            border-right: 1px solid #ddd;
+        }
+
+        .sidebar-title {
+            padding: 1rem;
+            font-size: 1.2rem;
+            font-weight: 500;
+            border-bottom: 1px solid #ddd;
+            background: white;
+        }
+
+        .track-list {
+            padding: 0;
+        }
+
+        .track-item {
+            background: white;
+            padding: 1rem;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+        }
+
+        .track-item:hover {
+            background: #f0f0f0;
+        }
+
+        .track-item h3 {
+            color: #333;
+            margin-bottom: 0.5rem;
+        }
+
+        .participants {
+            font-size: 0.9rem;
+            color: #666;
+            display: none;
+            padding: 0.5rem 0;
+        }
+
+        .participant {
+            padding: 0.3rem;
+            margin: 0.2rem 0;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+
+        .participant:hover {
+            background: rgba(0,0,0,0.05);
+        }
+
+        .sos-alert {
+            background: #ff4444;
             color: white;
+            padding: 0.3rem 0.6rem;
+            border-radius: 3px;
+            font-size: 0.8rem;
+            display: inline-block;
+            margin-left: 0.5rem;
+        }
+
+        #map {
+            width: 80%;
+            height: 100%;
+        }
+
+        .user-label {
+            background: white;
+            padding: 0.3rem 0.6rem;
+            border-radius: 3px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .sos-marker {
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); }
+        }
+
+        .status-online { color: #4CAF50; }
+        .status-offline { color: #FFC107; }
+
+        .connection-error {
+            padding: 1rem;
+            color: #666;
+            text-align: center;
+            font-style: italic;
         }
     </style>
 </head>
 <body>
-    <div class="track-list">
-        <h2>Tracks</h2>
-        <div id="tracks"></div>
-    </div>
-    <div id="dbStatus" class="db-status"></div>
-    <div id="map"></div>
+    <header class="header">
+        <div class="logo-container">
+            <img src="https://static.vecteezy.com/system/resources/previews/026/365/554/non_2x/marathon-run-sport-icon-running-competition-sign-vector.jpg" alt="Runner Logo" class="logo">
+        </div>
+        <div class="brand-container">
+            <div class="brand">runner</div>
+            <div class="online-status">
+                <span class="status-online">online</span>
+            </div>
+        </div>
+        <span class="material-icons menu-icon">menu</span>
+    </header>
+
+    <main class="content">
+        <aside class="sidebar">
+            <div class="sidebar-title">Забіги</div>
+            <div class="track-list" id="tracks"></div>
+        </aside>
+        <div id="map"></div>
+    </main>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
-        let map;
-        let tracks = {};
-        const colors = ['#FF0000', '#00FF00', '#0000FF', '#FF00FF', '#00FFFF', '#FFFF00'];
-        let colorIndex = 0;
-        const userColors = {};
+        let isSocketConnected = false;
+        let isDbConnected = false;
 
-        // Initialize map
-        function initMap() {
-            map = L.map('map').setView([50.3872275, 30.6053134], 13);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '© OpenStreetMap contributors'
-            }).addTo(map);
+        function updateConnectionStatus() {
+            const statusElement = document.querySelector('.online-status span');
+            if (isSocketConnected && isDbConnected) {
+                statusElement.textContent = 'online';
+                statusElement.className = 'status-online';
+            } else {
+                statusElement.textContent = 'offline';
+                statusElement.className = 'status-offline';
+            }
         }
 
-        // Fetch and display tracks
+        async function checkDbConnection() {
+            try {
+                const response = await fetch('/db-status');
+                const status = await response.json();
+                isDbConnected = status.connected;
+                updateConnectionStatus();
+                return status.connected;
+            } catch (error) {
+                console.error('DB connection error:', error);
+                isDbConnected = false;
+                updateConnectionStatus();
+                return false;
+            }
+        }
+
+        socket.on('connect', () => {
+            isSocketConnected = true;
+            updateConnectionStatus();
+            checkDbConnection();
+            fetchTracks();
+        });
+
+        socket.on('disconnect', () => {
+            isSocketConnected = false;
+            updateConnectionStatus();
+        });
+
         async function fetchTracks() {
-            const isConnected = await checkDbConnection();
-            if (!isConnected) {
-                const tracksDiv = document.getElementById('tracks');
-                tracksDiv.innerHTML = '<p>Cannot fetch tracks: Database not connected</p>';
+            const tracksDiv = document.getElementById('tracks');
+
+            if (!isSocketConnected || !isDbConnected) {
+                tracksDiv.innerHTML = '<div class="connection-error">Немає зв\'язку з сервером...</div>';
                 return;
             }
 
             try {
                 const response = await fetch('/tracks');
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 const data = await response.json();
 
-                const tracksDiv = document.getElementById('tracks');
                 tracksDiv.innerHTML = '';
 
                 const trackGroups = groupByTrack(data);
@@ -85,53 +256,49 @@
                     .sort(([a], [b]) => new Date(b) - new Date(a))
                     .forEach(([track, points]) => {
                         const trackDiv = document.createElement('div');
+                        trackDiv.className = 'track-item';
                         const hasSOS = points.some(p => p.sos);
+                        const participants = [...new Set(points.map(p => p.username.trim()))];
+
+                        const participantsHtml = participants.map(username => `
+                            <div class="participant" onclick="highlightUser('${username}', '${track}')">
+                                ${username}
+                            </div>
+                        `).join('');
 
                         trackDiv.innerHTML = `
-                            <h3>
-                                <a href="#" onclick="showMap('${track}'); return false;">
-                                    ${new Date(track).toLocaleString()}
-                                </a>
-                                ${hasSOS ? '<span class="sos-alert">SOS!</span>' : ''}
+                            <h3 onclick="toggleParticipants(this)">
+                                ${new Date(track).toLocaleString()}
+                                ${hasSOS ? '<span class="sos-alert">SOS</span>' : ''}
                             </h3>
-                            <p>Participants: ${[...new Set(points.map(p => p.username.trim()))].join(', ')}</p>
+                            <div class="participants">
+                                ${participantsHtml}
+                            </div>
                         `;
+
+                        trackDiv.querySelector('h3').addEventListener('click', () => showMap(track));
                         tracksDiv.appendChild(trackDiv);
                     });
             } catch (error) {
                 console.error('Error fetching tracks:', error);
-                const tracksDiv = document.getElementById('tracks');
-                tracksDiv.innerHTML = '<p>Error loading tracks. Please try again later.</p>';
+                tracksDiv.innerHTML = '<div class="connection-error">Немає зв\'язку з сервером...</div>';
             }
         }
 
-        function groupByTrack(data) {
-            return data.reduce((acc, point) => {
-                const track = point.track || point.timestamp.split('.')[0];
-                if (!acc[track]) {
-                    acc[track] = [];
-                }
-                acc[track].push(point);
-                return acc;
-            }, {});
+        function toggleParticipants(element) {
+            const participantsDiv = element.nextElementSibling;
+            participantsDiv.style.display = participantsDiv.style.display === 'none' ? 'block' : 'none';
         }
 
-        function getUserColor(username) {
-            if (!userColors[username]) {
-                userColors[username] = colors[colorIndex % colors.length];
-                colorIndex++;
-            }
-            return userColors[username];
+        function highlightUser(username, trackTime) {
+            showMap(trackTime, username);
         }
 
-        async function showMap(trackTime) {
+        async function showMap(trackTime, highlightUsername = null) {
             const response = await fetch(`/track/${encodeURIComponent(trackTime)}`);
             const points = await response.json();
 
-            document.getElementById('map').style.display = 'block';
-            if (!map) {
-                initMap();
-            }
+            if (!map) initMap();
             map.eachLayer((layer) => {
                 if (layer instanceof L.Marker || layer instanceof L.Polyline) {
                     map.removeLayer(layer);
@@ -141,84 +308,74 @@
             const userGroups = {};
             points.forEach(point => {
                 const username = point.username.trim();
-                if (!userGroups[username]) {
-                    userGroups[username] = [];
-                }
+                if (!userGroups[username]) userGroups[username] = [];
                 userGroups[username].push(point);
             });
 
             Object.entries(userGroups).forEach(([username, userPoints]) => {
                 const color = getUserColor(username);
+                const isHighlighted = highlightUsername === username;
 
                 // Draw route
                 const coordinates = userPoints.map(p => [p.latitude, p.longitude]);
                 const path = L.polyline(coordinates, {
                     color: color,
-                    weight: 3
+                    weight: isHighlighted ? 5 : 3,
+                    opacity: isHighlighted ? 1 : 0.7
                 }).addTo(map);
 
                 // Add user label
                 const midPoint = coordinates[Math.floor(coordinates.length / 2)];
                 L.marker(midPoint, {
                     icon: L.divIcon({
-                        html: `<div style="background-color: ${color}; padding: 5px;">${username}</div>`,
-                        className: 'user-label'
+                        html: `<div class="user-label" style="border: 2px solid ${color}">${username}</div>`,
+                        className: 'user-label-container'
                     })
                 }).addTo(map);
 
-                // Add points
+                // Add points and SOS markers
                 userPoints.forEach(point => {
+                    if (point.sos) {
+                        L.marker([point.latitude, point.longitude], {
+                            icon: L.divIcon({
+                                html: `<div class="sos-marker" style="color: red; font-size: 24px;">⚠️</div>`,
+                                className: 'sos-marker-container'
+                            })
+                        })
+                        .bindPopup(`
+                            <b>SOS ALERT!</b><br>
+                            User: ${username}<br>
+                            Time: ${new Date(point.timestamp).toLocaleString()}<br>
+                            Location: ${point.latitude}, ${point.longitude}
+                        `)
+                        .addTo(map);
+                    }
+
                     const marker = L.marker([point.latitude, point.longitude])
                         .bindPopup(`
                             <b>${username}</b><br>
                             Lat: ${point.latitude}<br>
                             Lng: ${point.longitude}<br>
                             Time: ${new Date(point.timestamp).toLocaleString()}
-                            ${point.sos ? '<br><span class="sos-alert">SOS!</span>' : ''}
                         `)
                         .addTo(map);
                 });
             });
 
-            // Fit map to show all points
             const allPoints = points.map(p => [p.latitude, p.longitude]);
             map.fitBounds(L.latLngBounds(allPoints));
         }
 
-        async function checkDbConnection() {
-            try {
-                const response = await fetch('/db-status');
-                const status = await response.json();
-                const dbStatus = document.getElementById('dbStatus');
-
-                if (status.connected) {
-                    dbStatus.textContent = 'Database Connected';
-                    dbStatus.className = 'db-status db-connected';
-                    return true;
-                } else {
-                    dbStatus.textContent = 'Database Disconnected';
-                    dbStatus.className = 'db-status db-disconnected';
-                    return false;
-                }
-            } catch (error) {
-                console.error('Error checking DB status:', error);
-                return false;
-            }
-        }
-
-        // Add periodic connection check
+        // Regular connection checks
         setInterval(checkDbConnection, 5000);
 
-        // Initialize with connection check
+        // Initialize
         document.addEventListener('DOMContentLoaded', () => {
             checkDbConnection();
             fetchTracks();
         });
 
-        // Listen for new data
-        socket.on('new_runner', (data) => {
-            fetchTracks();
-        });
+        socket.on('new_runner', fetchTracks);
     </script>
 </body>
 </html>
