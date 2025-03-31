@@ -62,8 +62,8 @@
             display: grid;
             grid-template-columns: 1fr auto auto;
             gap: 1rem;
-            align-items: center;
-            padding: 0.8rem;
+            align-items: start;
+            padding: 1rem;
             border-bottom: 1px solid #eee;
         }
 
@@ -135,6 +135,20 @@
             gap: 1rem;
             margin-top: 1rem;
         }
+
+        .no-data {
+            padding: 1rem;
+            color: #666;
+            text-align: center;
+            font-style: italic;
+        }
+
+        .error {
+            padding: 1rem;
+            color: #f44336;
+            text-align: center;
+            font-style: italic;
+        }
     </style>
 </head>
 <body>
@@ -179,45 +193,75 @@
         const socket = io();
         let currentEditItem = null;
 
+        function getAuthHeaders() {
+            const adminPassword = localStorage.getItem('adminPassword');
+            return { Authorization: `Bearer ${adminPassword}` };
+        }
+
         async function loadData() {
             try {
                 const [tracksResponse, usersResponse] = await Promise.all([
-                    fetch('/admin/tracks'),
-                    fetch('/admin/users')
+                    fetch('/admin/tracks', {
+                        headers: getAuthHeaders()
+                    }),
+                    fetch('/admin/users', {
+                        headers: getAuthHeaders()
+                    })
                 ]);
+
+                if (!tracksResponse.ok || !usersResponse.ok) {
+                    throw new Error('Authentication failed');
+                }
 
                 const tracks = await tracksResponse.json();
                 const users = await usersResponse.json();
 
-                displayTracks(tracks);
-                displayUsers(users);
+                if (tracks && tracks.length > 0) {
+                    displayTracks(tracks);
+                } else {
+                    document.getElementById('tracksList').innerHTML = '<div class="no-data">No tracks found</div>';
+                }
+
+                if (users && users.length > 0) {
+                    displayUsers(users);
+                } else {
+                    document.getElementById('usersList').innerHTML = '<div class="no-data">No users found</div>';
+                }
             } catch (error) {
                 console.error('Error loading data:', error);
+                if (error.message === 'Authentication failed') {
+                    localStorage.removeItem('adminPassword');
+                    window.location.reload();
+                } else {
+                    document.getElementById('tracksList').innerHTML = '<div class="error">Failed to load tracks</div>';
+                    document.getElementById('usersList').innerHTML = '<div class="error">Failed to load users</div>';
+                }
             }
         }
 
         function displayTracks(tracks) {
             const tracksList = document.getElementById('tracksList');
             tracksList.innerHTML = tracks
-                .sort((a, b) => {
-                    const dateA = new Date(a._id);
-                    const dateB = new Date(b._id);
-
-                    if (!isNaN(dateA) && !isNaN(dateB)) {
-                        return dateB - dateA;
-                    }
-                    return b._id.localeCompare(a._id);
-                })
                 .map(track => {
-                    const trackDisplay = isNaN(new Date(track._id)) ?
-                        track._id :
-                        new Date(track._id).toLocaleString();
+                    const trackName = track._id || 'Unnamed Track';
+                    const sosIndicator = track.hasSOS ?
+                        '<span style="color: #f44336; margin-left: 8px;">⚠️ SOS</span>' : '';
+                    const userInfo = `${track.userCount} users, ${track.count} points`;
+                    const lastUpdate = new Date(track.lastUpdate).toLocaleString();
 
                     return `
                         <div class="track-item">
-                            <div>${trackDisplay} (${track.count} points)</div>
-                            <button class="btn btn-edit" onclick="editTrack('${track._id}')">Rename</button>
-                            <button class="btn btn-delete" onclick="deleteTrack('${track._id}')">Delete</button>
+                            <div>
+                                <div><strong>${trackName}</strong>${sosIndicator}</div>
+                                <div style="font-size: 0.9em; color: #666;">
+                                    ${userInfo}<br>
+                                    Last update: ${lastUpdate}
+                                </div>
+                            </div>
+                            ${track._id !== 'SOS Signals' ? `
+                                <button class="btn btn-edit" onclick="editTrack('${track._id}')">Rename</button>
+                                <button class="btn btn-delete" onclick="deleteTrack('${track._id}')">Delete</button>
+                            ` : ''}
                         </div>
                     `;
                 })
@@ -235,15 +279,9 @@
         }
 
         function editTrack(trackId) {
-            currentEditItem = { type: 'track', id: trackId };
+            currentEditItem = { type: 'track', id: trackId === '' ? 'null' : trackId };
             document.getElementById('modalTitle').textContent = 'Rename Track';
-
-            // Display current track name
-            const trackDisplay = isNaN(new Date(trackId)) ?
-                trackId :
-                new Date(trackId).toLocaleString();
-
-            document.getElementById('editInput').value = trackDisplay;
+            document.getElementById('editInput').value = trackId === 'null' ? '' : trackId;
             document.getElementById('editInput').placeholder = "Enter new track name";
             document.getElementById('editModal').style.display = 'flex';
         }
@@ -289,15 +327,19 @@
         async function deleteTrack(trackId) {
             if (confirm('Are you sure you want to delete this track?')) {
                 try {
-                    const response = await fetch(`/admin/track/${trackId}`, {
+                    const response = await fetch(`/admin/track/${trackId === '' ? 'null' : trackId}`, {
                         method: 'DELETE'
                     });
 
                     if (response.ok) {
                         loadData();
+                    } else {
+                        const error = await response.json();
+                        alert(error.message || 'Failed to delete track');
                     }
                 } catch (error) {
                     console.error('Error deleting track:', error);
+                    alert('Failed to delete track');
                 }
             }
         }

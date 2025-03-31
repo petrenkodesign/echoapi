@@ -129,15 +129,26 @@ app.get('/track/:timestamp', checkAuth, async (req, res) => {
 // Add new admin endpoints
 
 // Get all tracks with aggregated info
-app.get('/admin/tracks', async (req, res) => {
+app.get('/admin/tracks', checkAuth, async (req, res) => {
     try {
+        if (!isDbConnected) {
+            return res.status(503).json({ error: 'Database not connected' });
+        }
+
         const tracks = await db.collection('runners').aggregate([
             {
                 $group: {
-                    _id: '$track',
+                    _id: {
+                        $cond: {
+                            if: { $eq: ["$track", null] },
+                            then: "SOS Signals",
+                            else: "$track"
+                        }
+                    },
                     count: { $sum: 1 },
                     lastUpdate: { $max: '$timestamp' },
-                    users: { $addToSet: '$username' }
+                    users: { $addToSet: '$username' },
+                    hasSOS: { $max: { $cond: [{ $eq: ["$sos", true] }, 1, 0] } }
                 }
             },
             {
@@ -145,11 +156,17 @@ app.get('/admin/tracks', async (req, res) => {
                     _id: 1,
                     count: 1,
                     lastUpdate: 1,
-                    userCount: { $size: '$users' }
+                    userCount: { $size: '$users' },
+                    users: 1,
+                    hasSOS: 1
                 }
             },
             { $sort: { lastUpdate: -1 } }
         ]).toArray();
+
+        if (!tracks || tracks.length === 0) {
+            return res.json([]);
+        }
 
         res.json(tracks);
     } catch (error) {
@@ -171,39 +188,27 @@ app.get('/admin/users', async (req, res) => {
 });
 
 // Update track
-app.put('/admin/track', async (req, res) => {
+app.put('/admin/track', checkAuth, async (req, res) => {
+    const { oldValue, newValue } = req.body;
+
+    if (!newValue || newValue.trim() === '') {
+        return res.status(400).json({ message: 'Track name cannot be empty' });
+    }
+
     try {
-        const { oldValue, newValue } = req.body;
+        const filter = { track: oldValue === 'null' ? null : oldValue };
+        const update = { $set: { track: newValue } };
 
-        if (!newValue.trim()) {
-            return res.status(400).json({
-                error: 'Track name cannot be empty'
-            });
+        const result = await db.collection('runners').updateMany(filter, update);
+
+        if (result.modifiedCount > 0) {
+            res.json({ message: 'Track renamed successfully' });
+        } else {
+            res.status(404).json({ message: 'Track not found' });
         }
-
-        // Check if new track name already exists
-        const existing = await db.collection('runners').findOne({
-            track: newValue
-        });
-
-        if (existing && oldValue !== newValue) {
-            return res.status(400).json({
-                error: 'Track name already exists'
-            });
-        }
-
-        await db.collection('runners').updateMany(
-            { track: oldValue },
-            { $set: { track: newValue.trim() } }
-        );
-
-        io.emit('data_updated');
-        res.json({ success: true });
     } catch (error) {
-        console.error('Error updating track:', error);
-        res.status(500).json({
-            error: 'Failed to update track'
-        });
+        console.error('Error renaming track:', error);
+        res.status(500).json({ message: 'Failed to rename track' });
     }
 });
 
@@ -223,13 +228,22 @@ app.put('/admin/user', async (req, res) => {
 });
 
 // Delete track
-app.delete('/admin/track/:trackId', async (req, res) => {
+app.delete('/admin/track/:trackId', checkAuth, async (req, res) => {
+    const trackId = req.params.trackId;
+
     try {
-        await db.collection('runners').deleteMany({ track: req.params.trackId });
-        io.emit('data_updated');
-        res.json({ success: true });
+        const filter = { track: trackId === 'null' ? null : trackId };
+
+        const result = await db.collection('runners').deleteMany(filter);
+
+        if (result.deletedCount > 0) {
+            res.json({ message: 'Track deleted successfully' });
+        } else {
+            res.status(404).json({ message: 'Track not found' });
+        }
     } catch (error) {
-        res.status(500).json({ error: 'Failed to delete track' });
+        console.error('Error deleting track:', error);
+        res.status(500).json({ message: 'Failed to delete track' });
     }
 });
 
