@@ -446,7 +446,16 @@
                 const trackGroups = groupByTrack(data);
 
                 Object.entries(trackGroups)
-                    .sort(([a], [b]) => new Date(b) - new Date(a))
+                    .sort(([a], [b]) => {
+                        const dateA = new Date(a);
+                        const dateB = new Date(b);
+
+                        if (!isNaN(dateA) && !isNaN(dateB)) {
+                            return dateB - dateA;
+                        }
+
+                        return b.localeCompare(a);
+                    })
                     .forEach(([track, points]) => {
                         const trackDiv = document.createElement('div');
                         trackDiv.className = 'track-item';
@@ -459,9 +468,13 @@
                             </div>
                         `).join('');
 
+                        const trackDisplay = isNaN(new Date(track)) ?
+                            track :
+                            new Date(track).toLocaleString();
+
                         trackDiv.innerHTML = `
                             <h4 onclick="toggleParticipants(this)">
-                                ${new Date(track).toLocaleString()}
+                                ${trackDisplay}
                                 ${hasSOS ? '<span class="sos-alert">SOS</span>' : ''}
                             </h4>
                             <div class="participants">

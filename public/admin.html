@@ -198,13 +198,30 @@
 
         function displayTracks(tracks) {
             const tracksList = document.getElementById('tracksList');
-            tracksList.innerHTML = tracks.map(track => `
-                <div class="track-item">
-                    <div>${new Date(track._id).toLocaleString()} (${track.count} points)</div>
-                    <button class="btn btn-edit" onclick="editTrack('${track._id}')">Rename</button>
-                    <button class="btn btn-delete" onclick="deleteTrack('${track._id}')">Delete</button>
-                </div>
-            `).join('');
+            tracksList.innerHTML = tracks
+                .sort((a, b) => {
+                    const dateA = new Date(a._id);
+                    const dateB = new Date(b._id);
+
+                    if (!isNaN(dateA) && !isNaN(dateB)) {
+                        return dateB - dateA;
+                    }
+                    return b._id.localeCompare(a._id);
+                })
+                .map(track => {
+                    const trackDisplay = isNaN(new Date(track._id)) ?
+                        track._id :
+                        new Date(track._id).toLocaleString();
+
+                    return `
+                        <div class="track-item">
+                            <div>${trackDisplay} (${track.count} points)</div>
+                            <button class="btn btn-edit" onclick="editTrack('${track._id}')">Rename</button>
+                            <button class="btn btn-delete" onclick="deleteTrack('${track._id}')">Delete</button>
+                        </div>
+                    `;
+                })
+                .join('');
         }
 
         function displayUsers(users) {
@@ -220,7 +237,14 @@
         function editTrack(trackId) {
             currentEditItem = { type: 'track', id: trackId };
             document.getElementById('modalTitle').textContent = 'Rename Track';
-            document.getElementById('editInput').value = new Date(trackId).toLocaleString();
+
+            // Display current track name
+            const trackDisplay = isNaN(new Date(trackId)) ?
+                trackId :
+                new Date(trackId).toLocaleString();
+
+            document.getElementById('editInput').value = trackDisplay;
+            document.getElementById('editInput').placeholder = "Enter new track name";
             document.getElementById('editModal').style.display = 'flex';
         }
 
@@ -232,7 +256,13 @@
         }
 
         async function saveEdit() {
-            const newValue = document.getElementById('editInput').value;
+            const newValue = document.getElementById('editInput').value.trim();
+
+            if (!newValue) {
+                alert('Track name cannot be empty');
+                return;
+            }
+
             try {
                 const response = await fetch(`/admin/${currentEditItem.type}`, {
                     method: 'PUT',
@@ -246,9 +276,13 @@
                 if (response.ok) {
                     loadData();
                     closeModal();
+                } else {
+                    const error = await response.json();
+                    alert(error.message || 'Failed to save changes');
                 }
             } catch (error) {
                 console.error('Error saving changes:', error);
+                alert('Failed to save changes');
             }
         }
 

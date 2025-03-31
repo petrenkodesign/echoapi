@@ -128,21 +128,35 @@ app.get('/track/:timestamp', checkAuth, async (req, res) => {
 
 // Add new admin endpoints
 
-// Get all tracks with count
+// Get all tracks with aggregated info
 app.get('/admin/tracks', async (req, res) => {
     try {
         const tracks = await db.collection('runners').aggregate([
             {
                 $group: {
                     _id: '$track',
-                    count: { $sum: 1 }
+                    count: { $sum: 1 },
+                    lastUpdate: { $max: '$timestamp' },
+                    users: { $addToSet: '$username' }
                 }
             },
-            { $sort: { _id: -1 } }
+            {
+                $project: {
+                    _id: 1,
+                    count: 1,
+                    lastUpdate: 1,
+                    userCount: { $size: '$users' }
+                }
+            },
+            { $sort: { lastUpdate: -1 } }
         ]).toArray();
+
         res.json(tracks);
     } catch (error) {
-        res.status(500).json({ error: 'Failed to fetch tracks' });
+        console.error('Error fetching tracks:', error);
+        res.status(500).json({
+            error: 'Failed to fetch tracks'
+        });
     }
 });
 
@@ -160,14 +174,36 @@ app.get('/admin/users', async (req, res) => {
 app.put('/admin/track', async (req, res) => {
     try {
         const { oldValue, newValue } = req.body;
+
+        if (!newValue.trim()) {
+            return res.status(400).json({
+                error: 'Track name cannot be empty'
+            });
+        }
+
+        // Check if new track name already exists
+        const existing = await db.collection('runners').findOne({
+            track: newValue
+        });
+
+        if (existing && oldValue !== newValue) {
+            return res.status(400).json({
+                error: 'Track name already exists'
+            });
+        }
+
         await db.collection('runners').updateMany(
             { track: oldValue },
-            { $set: { track: newValue } }
+            { $set: { track: newValue.trim() } }
         );
+
         io.emit('data_updated');
         res.json({ success: true });
     } catch (error) {
-        res.status(500).json({ error: 'Failed to update track' });
+        console.error('Error updating track:', error);
+        res.status(500).json({
+            error: 'Failed to update track'
+        });
     }
 });
 
