@@ -336,7 +336,9 @@
 
         function initMap() {
             // Base map initialization
-            map = L.map('map').setView([50.3872275, 30.6053134], 13);
+            map = L.map('map', {
+            zoom: 16,  // Default zoom level
+        }).setView([50.406244, 30.589585], 13);
 
             // Define base layers
             const layers = {
