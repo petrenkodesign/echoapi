@@ -216,6 +216,26 @@
             margin-top: 1rem;
             font-size: 0.9rem;
         }
+
+        /* Centered message for the map */
+        .map-placeholder {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            color: #888; /* Gray color */
+            font-size: 1.2rem; /* Slightly larger font size */
+            text-align: center;
+        }
+
+        /* Styled message for no tracks */
+        .no-data {
+            color: #888; /* Gray color */
+            font-size: 0.9rem; /* Smaller font size */
+            text-align: center;
+            margin: 2rem 0; /* Add more spacing */
+            font-style: italic;
+        }
     </style>
 </head>
 <body>
@@ -245,7 +265,7 @@
 
     <main class="content">
         <aside class="sidebar">
-            <div class="sidebar-title">Забіги</div>
+            <div class="sidebar-title">Маршрути</div>
             <div class="track-list" id="tracks"></div>
         </aside>
         <div id="map"></div>
@@ -430,9 +450,11 @@
 
         async function fetchTracks() {
             const tracksDiv = document.getElementById('tracks');
+            const mapDiv = document.getElementById('map');
 
             if (!isSocketConnected || !isDbConnected) {
                 tracksDiv.innerHTML = '<div class="connection-error">Немає зв\'язку з сервером...</div>';
+                mapDiv.innerHTML = '<div class="connection-error">Оберіть маршрут, щоб побачити карту</div>';
                 return;
             }
 
@@ -442,6 +464,12 @@
                 const data = await response.json();
 
                 tracksDiv.innerHTML = '';
+
+                if (data.length === 0) {
+                    tracksDiv.innerHTML = '<div class="no-data">Маршрути не знайдені</div>';
+                    mapDiv.innerHTML = '<div class="map-placeholder">Оберіть маршрут, щоб побачити карту</div>';
+                    return;
+                }
 
                 const trackGroups = groupByTrack(data);
 
@@ -479,6 +507,7 @@
             } catch (error) {
                 console.error('Error fetching tracks:', error);
                 tracksDiv.innerHTML = '<div class="connection-error">Немає зв\'язку з сервером...</div>';
+                mapDiv.innerHTML = '<div class="connection-error">Оберіть маршрут, щоб побачити карту</div>';
             }
         }
 
@@ -492,6 +521,13 @@
         }
 
         async function showMap(trackTime, highlightUsername = null) {
+            const mapDiv = document.getElementById('map');
+
+            if (!trackTime) {
+                mapDiv.innerHTML = '<div class="map-placeholder">Оберіть маршрут, щоб побачити карту</div>';
+                return;
+            }
+
             const response = await fetch(`/track/${encodeURIComponent(trackTime)}`);
             const points = await response.json();
 
