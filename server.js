@@ -72,8 +72,29 @@ app.get('/db-status', (req, res) => {
   res.json({ connected: isDbConnected });
 });
 
+// Authentication middleware
+function checkAuth(req, res, next) {
+    const isAuthenticated = req.headers['x-auth'] === process.env.APP_PASSWORD;
+    if (!isAuthenticated) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+    next();
+}
+
+// Add to your existing endpoints
+app.post('/verify-password', (req, res) => {
+    const { password } = req.body;
+    const correctPassword = process.env.APP_PASSWORD || 'your_password_here'; // Use environment variable
+
+    if (password === correctPassword) {
+        res.json({ success: true });
+    } else {
+        res.status(401).json({ success: false });
+    }
+});
+
 // Get all tracks
-app.get('/tracks', async (req, res) => {
+app.get('/tracks', checkAuth, async (req, res) => {
   if (!isDbConnected) {
     return res.status(503).json({ error: 'Database not connected' });
   }
@@ -87,7 +108,7 @@ app.get('/tracks', async (req, res) => {
 });
 
 // Get specific track
-app.get('/track/:timestamp', async (req, res) => {
+app.get('/track/:timestamp', checkAuth, async (req, res) => {
   try {
     const trackTime = req.params.timestamp;
     const points = await db.collection('runners')

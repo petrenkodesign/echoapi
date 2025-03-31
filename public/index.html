@@ -141,6 +141,7 @@
         }
 
         .user-label {
+            display: inline-flex;
             background: white;
             padding: 0.3rem 0.6rem;
             border-radius: 3px;
@@ -166,9 +167,67 @@
             text-align: center;
             font-style: italic;
         }
+
+        .login-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.95);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+        }
+
+        .login-form {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        .login-form input {
+            display: block;
+            width: 100%;
+            padding: 0.5rem;
+            margin: 1rem 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .login-form button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 0.5rem 1.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .login-form button:hover {
+            background: #45a049;
+        }
+
+        .login-error {
+            color: #ff4444;
+            margin-top: 1rem;
+            font-size: 0.9rem;
+        }
     </style>
 </head>
 <body>
+    <div id="loginOverlay" class="login-overlay">
+        <form class="login-form" id="loginForm" onsubmit="return false;">
+            <h2>Runner Tracking</h2>
+            <input type="password" id="password" placeholder="Enter password" required>
+            <button onclick="checkPassword()">Login</button>
+            <div id="loginError" class="login-error"></div>
+        </form>
+    </div>
+
     <header class="header">
         <div class="logo-container">
             <img src="https://static.vecteezy.com/system/resources/previews/026/365/554/non_2x/marathon-run-sport-icon-running-competition-sign-vector.jpg" alt="Runner Logo" class="logo">
@@ -195,6 +254,57 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="/socket.io/socket.io.js"></script>
     <script>
+        const CORRECT_PASSWORD = '88888888'; // Change this to your desired password
+
+        function checkPassword() {
+            const password = document.getElementById('password').value;
+            const loginOverlay = document.getElementById('loginOverlay');
+            const loginError = document.getElementById('loginError');
+
+            if (password === CORRECT_PASSWORD) {
+                localStorage.setItem('isAuthenticated', 'true');
+                loginOverlay.style.display = 'none';
+                initializeApp(); // We'll wrap our existing initialization in this function
+            } else {
+                loginError.textContent = 'Incorrect password';
+                document.getElementById('password').value = '';
+            }
+        }
+
+        function checkAuth() {
+            const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
+            const loginOverlay = document.getElementById('loginOverlay');
+
+            if (isAuthenticated) {
+                loginOverlay.style.display = 'none';
+                initializeApp();
+            } else {
+                loginOverlay.style.display = 'flex';
+            }
+        }
+
+        // Wrap existing initialization code
+        function initializeApp() {
+            checkDbConnection();
+            fetchTracks();
+        }
+
+        // Add password check on Enter key
+        document.getElementById('password').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                checkPassword();
+            }
+        });
+
+        // Check authentication on page load
+        document.addEventListener('DOMContentLoaded', checkAuth);
+
+        // Add logout function to menu icon
+        document.querySelector('.menu-icon').addEventListener('click', function() {
+            localStorage.removeItem('isAuthenticated');
+            window.location.reload();
+        });
+
         const socket = io();
         let isSocketConnected = false;
         let isDbConnected = false;
