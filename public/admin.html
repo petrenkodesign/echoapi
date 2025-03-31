@@ -149,9 +149,70 @@
             text-align: center;
             font-style: italic;
         }
+
+        .login-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.95);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+        }
+
+        .login-form {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        .login-form h2 {
+            margin-bottom: 1rem;
+        }
+
+        .login-form input {
+            display: block;
+            width: 100%;
+            padding: 0.5rem;
+            margin: 1rem 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .login-form button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 0.5rem 1.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .login-form button:hover {
+            background: #45a049;
+        }
+
+        .login-error {
+            color: #ff4444;
+            margin-top: 1rem;
+            font-size: 0.9rem;
+        }
     </style>
 </head>
 <body>
+    <div id="loginOverlay" class="login-overlay">
+        <form class="login-form" id="loginForm" onsubmit="return false;">
+            <h2>Runner Tracking Admin</h2>
+            <input type="password" id="password" placeholder="Enter password" required>
+            <button onclick="checkPassword()">Login</button>
+            <div id="loginError" class="login-error"></div>
+        </form>
+    </div>
     <header class="header">
         <a href="/" style="color: inherit; text-decoration: none;">
             <span class="material-icons">arrow_back</span>
@@ -192,6 +253,56 @@
     <script>
         const socket = io();
         let currentEditItem = null;
+
+        const CORRECT_PASSWORD = '88888888'; // Use the same password as in index.html
+
+        function checkPassword() {
+            const password = document.getElementById('password').value;
+            const loginOverlay = document.getElementById('loginOverlay');
+            const loginError = document.getElementById('loginError');
+
+            if (password === CORRECT_PASSWORD) {
+                localStorage.setItem('isAuthenticated', 'true');
+                loginOverlay.style.display = 'none';
+                initializeApp();
+            } else {
+                loginError.textContent = 'Incorrect password';
+                document.getElementById('password').value = '';
+            }
+        }
+
+        function checkAuth() {
+            const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
+            const loginOverlay = document.getElementById('loginOverlay');
+
+            if (isAuthenticated) {
+                loginOverlay.style.display = 'none';
+                initializeApp();
+            } else {
+                loginOverlay.style.display = 'flex';
+            }
+        }
+
+        function initializeApp() {
+            loadData();
+        }
+
+        // Add password check on Enter key
+        document.getElementById('password').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                checkPassword();
+            }
+        });
+
+        // Remove the existing DOMContentLoaded listener and replace with:
+        document.addEventListener('DOMContentLoaded', checkAuth);
+
+        // Add logout functionality to the back button
+        document.querySelector('a[href="/"]').addEventListener('click', function(e) {
+            e.preventDefault();
+            localStorage.removeItem('isAuthenticated');
+            window.location.href = '/';
+        });
 
         function getAuthHeaders() {
             const adminPassword = localStorage.getItem('adminPassword');
@@ -366,8 +477,6 @@
             currentEditItem = null;
         }
 
-        // Initialize
-        document.addEventListener('DOMContentLoaded', loadData);
         socket.on('data_updated', loadData);
     </script>
 </body>
