@@ -315,10 +315,60 @@
         const userColors = {};
 
         function initMap() {
+            // Base map initialization
             map = L.map('map').setView([50.3872275, 30.6053134], 13);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '© OpenStreetMap contributors'
-            }).addTo(map);
+
+            // Define base layers
+            const layers = {
+                osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© OpenStreetMap contributors',
+                    name: 'OpenStreetMap'
+                }),
+                satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                    attribution: 'Tiles © Esri',
+                    name: 'Satellite'
+                }),
+                terrain: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+                    attribution: '© OpenTopoMap contributors',
+                    name: 'Terrain'
+                })
+            };
+
+            // Define overlay layers
+            const overlays = {
+                tracks: L.layerGroup([]),
+                markers: L.layerGroup([]),
+                labels: L.layerGroup([]),
+                sos: L.layerGroup([])
+            };
+
+            // Add default layer
+            layers.osm.addTo(map);
+
+            // Add layer controls
+            L.control.layers(
+                {
+                    'OpenStreetMap': layers.osm,
+                    'Satellite': layers.satellite,
+                    'Terrain': layers.terrain
+                },
+                {
+                    'Tracks': overlays.tracks,
+                    'Markers': overlays.markers,
+                    'Labels': overlays.labels,
+                    'SOS Alerts': overlays.sos
+                }
+            ).addTo(map);
+
+            // Store layers in map object for later use
+            map.layers = layers;
+            map.overlays = overlays;
+
+            // Add all overlay layers to map by default
+            Object.values(overlays).forEach(layer => layer.addTo(map));
+
+            // Add scale control
+            L.control.scale().addTo(map);
         }
 
         function groupByTrack(data) {
@@ -442,11 +492,9 @@
             const points = await response.json();
 
             if (!map) initMap();
-            map.eachLayer((layer) => {
-                if (layer instanceof L.Marker || layer instanceof L.Polyline) {
-                    map.removeLayer(layer);
-                }
-            });
+
+            // Clear existing layers
+            Object.values(map.overlays).forEach(layer => layer.clearLayers());
 
             const userGroups = {};
             points.forEach(point => {
@@ -465,7 +513,7 @@
                     color: color,
                     weight: isHighlighted ? 5 : 3,
                     opacity: isHighlighted ? 1 : 0.7
-                }).addTo(map);
+                }).addTo(map.overlays.tracks);
 
                 // Add user label
                 const midPoint = coordinates[Math.floor(coordinates.length / 2)];
@@ -474,7 +522,7 @@
                         html: `<div class="user-label" style="border: 2px solid ${color}">${username}</div>`,
                         className: 'user-label-container'
                     })
-                }).addTo(map);
+                }).addTo(map.overlays.labels);
 
                 // Add points and SOS markers
                 userPoints.forEach(point => {
@@ -491,7 +539,7 @@
                             Time: ${new Date(point.timestamp).toLocaleString()}<br>
                             Location: ${point.latitude}, ${point.longitude}
                         `)
-                        .addTo(map);
+                        .addTo(map.overlays.sos);
                     }
 
                     const marker = L.marker([point.latitude, point.longitude])
@@ -501,7 +549,7 @@
                             Lng: ${point.longitude}<br>
                             Time: ${new Date(point.timestamp).toLocaleString()}
                         `)
-                        .addTo(map);
+                        .addTo(map.overlays.markers);
                 });
             });
 
