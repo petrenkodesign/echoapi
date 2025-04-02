@@ -148,7 +148,14 @@ app.get('/admin/tracks', checkAuth, async (req, res) => {
                     count: { $sum: 1 },
                     lastUpdate: { $max: '$timestamp' },
                     users: { $addToSet: '$username' },
-                    hasSOS: { $max: { $cond: [{ $eq: ["$sos", true] }, 1, 0] } }
+                    hasSOS: { $max: { $cond: [{ $eq: ["$sos", true] }, 1, 0] } },
+                    // Add device info
+                    devices: {
+                        $addToSet: {
+                            device_id: '$device_id',
+                            imei: '$imei'
+                        }
+                    }
                 }
             },
             {
@@ -158,7 +165,14 @@ app.get('/admin/tracks', checkAuth, async (req, res) => {
                     lastUpdate: 1,
                     userCount: { $size: '$users' },
                     users: 1,
-                    hasSOS: 1
+                    hasSOS: 1,
+                    devices: {
+                        $filter: {
+                            input: '$devices',
+                            as: 'device',
+                            cond: { $ne: ['$$device.device_id', null] }
+                        }
+                    }
                 }
             },
             { $sort: { lastUpdate: -1 } }
