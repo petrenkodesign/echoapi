@@ -153,7 +153,8 @@ app.get('/admin/tracks', checkAuth, async (req, res) => {
                     devices: {
                         $addToSet: {
                             device_id: '$device_id',
-                            imei: '$imei'
+                            imei: '$imei',
+                            username: '$username'  // Add username to device info
                         }
                     }
                 }
