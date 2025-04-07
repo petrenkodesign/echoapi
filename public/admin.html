@@ -202,6 +202,50 @@
             margin-top: 1rem;
             font-size: 0.9rem;
         }
+
+        .clickable {
+            cursor: pointer;
+            color: #2196F3;
+            transition: color 0.2s;
+        }
+
+        .clickable:hover {
+            color: #1976D2;
+        }
+
+        .detailed-info {
+            margin-top: 0.5rem;
+            padding: 0.5rem;
+            background: #f8f8f8;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+        }
+
+        .user-detail-item {
+            padding: 0.5rem;
+            border-bottom: 1px solid #eee;
+        }
+
+        .user-detail-item:last-child {
+            border-bottom: none;
+        }
+
+        .user-name {
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+        }
+
+        .device-info {
+            padding-left: 1rem;
+            font-size: 0.9em;
+            color: #666;
+            line-height: 1.4;
+        }
+
+        .toggle-indicator {
+            display: inline-block;
+            transition: transform 0.3s ease;
+        }
     </style>
 </head>
 <body>
@@ -357,17 +401,83 @@
                     const trackName = track._id || 'Unnamed Track';
                     const sosIndicator = track.hasSOS ?
                         '<span style="color: #f44336; margin-left: 8px;">⚠️ SOS</span>' : '';
-                    const userInfo = `${track.userCount} users, ${track.count} points`;
-                    const lastUpdate = new Date(track.lastUpdate).toLocaleString();
+
+                    // Create a map of devices by username
+                    const userDevicesMap = new Map();
+                    track.devices.forEach(device => {
+                        if (device.device_id) {
+                            const username = device.username || 'unknown';
+                            if (!userDevicesMap.has(username)) {
+                                userDevicesMap.set(username, []);
+                            }
+                            userDevicesMap.get(username).push(device);
+                        }
+                    });
+
+                    // Create detailed users info
+                    const usersDetailedInfo = track.users
+                        .map(user => {
+                            if (user) {
+                                // Get devices only for this user
+                                const userDevices = (userDevicesMap.get(user) || [])
+                                    .map(device =>
+                                        `<div class="device-info">
+                                            Device ID: ${device.device_id || 'Unknown'}<br>
+                                            IMEI: ${device.imei || 'Unknown'}
+                                        </div>`
+                                    ).join('');
+
+                                return `
+                                    <div class="user-detail-item">
+                                        <div class="user-name">👤 ${user}</div>
+                                        ${userDevices}
+                                    </div>`;
+                            }
+                            return null;
+                        })
+                        .filter(info => info)
+                        .join('');
+
+                    // Add unnamed users with their specific devices
+                    const unnamedUsersInfo = !track.users.some(user => user) ?
+                        Array.from(userDevicesMap.entries())
+                            .filter(([username]) => username === 'unknown')
+                            .map(([_, devices]) =>
+                                devices.map(device => `
+                                    <div class="user-detail-item">
+                                        <div class="user-name">📱 Unknown User</div>
+                                        <div class="device-info">
+                                            Device ID: ${device.device_id}<br>
+                                            IMEI: ${device.imei || 'Unknown'}
+                                        </div>
+                                    </div>
+                                `).join('')
+                            ).join('') : '';
+
+                    // Combine named and unnamed users
+                    const allUsersInfo = usersDetailedInfo + unnamedUsersInfo;
+
+                    // Create collapsible info section
+                    const detailedInfo = `
+                        <div class="detailed-info" style="display: none;">
+                            <div class="users-list">
+                                ${allUsersInfo}
+                            </div>
+                        </div>`;
 
                     return `
                         <div class="track-item">
                             <div>
                                 <div><strong>${trackName}</strong>${sosIndicator}</div>
-                                <div style="font-size: 0.9em; color: #666;">
-                                    ${userInfo}<br>
-                                    Last update: ${lastUpdate}
+                                <div class="track-summary" style="font-size: 0.9em; color: #666;">
+                                    <span class="clickable" onclick="toggleDetailedInfo(this)">
+                                        <span class="toggle-indicator">▶</span>
+                                        👤 ${track.userCount} users, 📍 ${track.count} points
+                                    </span>
+                                    <br>
+                                    Last update: ${new Date(track.lastUpdate).toLocaleString()}
                                 </div>
+                                ${detailedInfo}
                             </div>
                             ${track._id !== 'SOS Signals' ? `
                                 <button class="btn btn-edit" onclick="editTrack('${track._id}')">Rename</button>
@@ -475,6 +585,20 @@
         function closeModal() {
             document.getElementById('editModal').style.display = 'none';
             currentEditItem = null;
+        }
+
+        function toggleDetailedInfo(element) {
+            const detailedInfo = element.closest('.track-item').querySelector('.detailed-info');
+            if (detailedInfo) {
+                const isHidden = detailedInfo.style.display === 'none';
+                detailedInfo.style.display = isHidden ? 'block' : 'none';
+
+                // Rotate the emoji to indicate state
+                const emoji = element.querySelector('.toggle-indicator');
+                if (emoji) {
+                    emoji.style.transform = isHidden ? 'rotate(90deg)' : 'rotate(0deg)';
+                }
+            }
         }
 
         socket.on('data_updated', loadData);

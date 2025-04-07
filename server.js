@@ -15,6 +15,9 @@ let db;
 // Add connection state variable
 let isDbConnected = false;
 
+// Add device mapping cache
+const deviceImeiMap = new Map();
+
 // Connect to MongoDB
 MongoClient.connect(mongoUrl)
   .then(client => {
@@ -50,13 +53,36 @@ app.post('/echo', (req, res) => {
 // New endpoint for storing runner data
 app.post('/call', async (req, res) => {
   try {
-    const result = await db.collection('runners').insertOne(req.body);
-    console.log('Stored runner data:', req.body);
-    io.emit('new_runner', req.body);
+    const { latitude, longitude, timestamp, username, track, device_id, imei, sos } = req.body;
+
+    // Update device-IMEI mapping if IMEI is provided
+    if (device_id && imei) {
+      deviceImeiMap.set(device_id, imei);
+    }
+
+    // Get IMEI from cache if not provided in current request
+    const cachedImei = device_id ? deviceImeiMap.get(device_id) : null;
+
+    const runnerData = {
+      latitude: parseFloat(latitude),
+      longitude: parseFloat(longitude),
+      timestamp: timestamp || new Date().toISOString(),
+      username: username || null,
+      device_id: device_id || null,
+      imei: imei || cachedImei || null, // Use cached IMEI if available
+      track: track || null,
+      sos: sos || false
+    };
+
+    const result = await db.collection('runners').insertOne(runnerData);
+    console.log('Stored runner data:', runnerData);
+
+    io.emit('new_runner', runnerData);
+
     res.json({
       success: true,
       id: result.insertedId,
-      data: req.body
+      data: runnerData
     });
   } catch (error) {
     console.error('Error storing data:', error);
@@ -148,7 +174,15 @@ app.get('/admin/tracks', checkAuth, async (req, res) => {
                     count: { $sum: 1 },
                     lastUpdate: { $max: '$timestamp' },
                     users: { $addToSet: '$username' },
-                    hasSOS: { $max: { $cond: [{ $eq: ["$sos", true] }, 1, 0] } }
+                    hasSOS: { $max: { $cond: [{ $eq: ["$sos", true] }, 1, 0] } },
+                    // Add device info
+                    devices: {
+                        $addToSet: {
+                            device_id: '$device_id',
+                            imei: '$imei',
+                            username: '$username'  // Add username to device info
+                        }
+                    }
                 }
             },
             {
@@ -158,7 +192,14 @@ app.get('/admin/tracks', checkAuth, async (req, res) => {
                     lastUpdate: 1,
                     userCount: { $size: '$users' },
                     users: 1,
-                    hasSOS: 1
+                    hasSOS: 1,
+                    devices: {
+                        $filter: {
+                            input: '$devices',
+                            as: 'device',
+                            cond: { $ne: ['$$device.device_id', null] }
+                        }
+                    }
                 }
             },
             { $sort: { lastUpdate: -1 } }
