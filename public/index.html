@@ -276,21 +276,34 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="/socket.io/socket.io.js"></script>
     <script>
-        const CORRECT_PASSWORD = '88888888'; // Change this to your desired password
-
         function checkPassword() {
             const password = document.getElementById('password').value;
             const loginOverlay = document.getElementById('loginOverlay');
             const loginError = document.getElementById('loginError');
 
-            if (password === CORRECT_PASSWORD) {
-                localStorage.setItem('isAuthenticated', 'true');
-                loginOverlay.style.display = 'none';
-                initializeApp(); // We'll wrap our existing initialization in this function
-            } else {
-                loginError.textContent = 'Incorrect password';
+            fetch('/check-password', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ password })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.authenticated) {
+                    localStorage.setItem('isAuthenticated', 'true');
+                    loginOverlay.style.display = 'none';
+                    initializeApp();
+                } else {
+                    loginError.textContent = data.message || 'Incorrect password';
+                    document.getElementById('password').value = '';
+                }
+            })
+            .catch(error => {
+                console.error('Error checking password:', error);
+                loginError.textContent = 'Error checking password';
                 document.getElementById('password').value = '';
-            }
+            });
         }
 
         function checkAuth() {

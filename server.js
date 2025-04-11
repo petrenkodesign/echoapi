@@ -18,6 +18,9 @@ let isDbConnected = false;
 // Add device mapping cache
 const deviceImeiMap = new Map();
 
+// Set password
+const CORRECT_PASSWORD = '88888888';
+
 // Connect to MongoDB
 MongoClient.connect(mongoUrl)
   .then(client => {
@@ -297,6 +300,15 @@ app.post('/admin/clear-data', async (req, res) => {
     } catch (error) {
         res.status(500).json({ error: 'Failed to clear data' });
     }
+});
+
+app.post('/check-password', (req, res) => {
+  const { password } = req.body;
+  if (password === CORRECT_PASSWORD) {
+      res.json({ authenticated: true });
+  } else {
+      res.status(401).json({ authenticated: false, message: 'Incorrect password' });
+  }
 });
 
 // WebSocket підключення

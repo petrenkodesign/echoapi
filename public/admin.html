@@ -298,21 +298,34 @@
         const socket = io();
         let currentEditItem = null;
 
-        const CORRECT_PASSWORD = '88888888'; // Use the same password as in index.html
-
         function checkPassword() {
             const password = document.getElementById('password').value;
             const loginOverlay = document.getElementById('loginOverlay');
             const loginError = document.getElementById('loginError');
 
-            if (password === CORRECT_PASSWORD) {
-                localStorage.setItem('isAuthenticated', 'true');
-                loginOverlay.style.display = 'none';
-                initializeApp();
-            } else {
-                loginError.textContent = 'Incorrect password';
+            fetch('/check-password', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ password })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.authenticated) {
+                    localStorage.setItem('isAuthenticated', 'true');
+                    loginOverlay.style.display = 'none';
+                    initializeApp();
+                } else {
+                    loginError.textContent = data.message || 'Incorrect password';
+                    document.getElementById('password').value = '';
+                }
+            })
+            .catch(error => {
+                console.error('Error checking password:', error);
+                loginError.textContent = 'Error checking password';
                 document.getElementById('password').value = '';
-            }
+            });
         }
 
         function checkAuth() {
