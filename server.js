@@ -273,21 +273,30 @@ app.put('/admin/user', async (req, res) => {
 
 // Delete track
 app.delete('/admin/track/:trackId', checkAuth, async (req, res) => {
-    const trackId = req.params.trackId;
-
     try {
-        const filter = { track: trackId === 'null' ? null : trackId };
+        const trackId = req.params.trackId === 'null' ? null : req.params.trackId;
+
+        const filter = trackId === null ?
+            { $or: [{ track: null }, { sos: true }] } :
+            { track: trackId };
 
         const result = await db.collection('runners').deleteMany(filter);
 
         if (result.deletedCount > 0) {
-            res.json({ message: 'Track deleted successfully' });
+            io.emit('data_updated');
+            res.json({
+                message: 'Track deleted successfully',
+                deletedCount: result.deletedCount
+            });
         } else {
             res.status(404).json({ message: 'Track not found' });
         }
     } catch (error) {
         console.error('Error deleting track:', error);
-        res.status(500).json({ message: 'Failed to delete track' });
+        res.status(500).json({
+            message: 'Failed to delete track',
+            error: error.message
+        });
     }
 });
 
