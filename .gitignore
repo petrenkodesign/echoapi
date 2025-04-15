@@ -1,3 +1,4 @@
 node_modules
 actions-runner
 .env
+.github/copilot-instructions.md

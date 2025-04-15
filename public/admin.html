@@ -492,10 +492,8 @@
                                 </div>
                                 ${detailedInfo}
                             </div>
-                            ${track._id !== 'SOS Signals' ? `
                                 <button class="btn btn-edit" onclick="editTrack('${track._id}')">Rename</button>
                                 <button class="btn btn-delete" onclick="deleteTrack('${track._id}')">Delete</button>
-                            ` : ''}
                         </div>
                     `;
                 })
