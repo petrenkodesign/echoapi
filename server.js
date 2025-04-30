@@ -355,30 +355,20 @@ app.get('/admin/export-db', checkAuth, async (req, res) => {
 
 async function exportDatabase() {
     try {
-        const response = await fetch('/admin/export-db', {
-            method: 'GET',
-            headers: getAuthHeaders()
-        });
+        const response = await fetch('/admin/export-db', { method: 'GET', headers: getAuthHeaders() });
+        const contentType = response.headers.get('content-type');
 
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Failed to export database');
+        if (contentType && contentType.includes('application/json')) {
+            const data = await response.json();
+            console.log('Export successful:', data);
+        } else {
+            const text = await response.text();
+            console.error('Unexpected response:', text);
+            alert('Failed to export database. Please check the server.');
         }
-
-        const { filePath } = await response.json();
-
-        // Trigger file download
-        const link = document.createElement('a');
-        link.href = filePath;
-        link.download = 'db-dump.json';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-
-        alert('Database exported successfully!');
     } catch (error) {
         console.error('Error exporting database:', error);
-        alert(error.message || 'Failed to export database');
+        alert('Failed to export database.');
     }
 }
 
