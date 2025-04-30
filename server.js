@@ -2,6 +2,8 @@ const http = require('http');
 const express = require('express');
 const socketIo = require('socket.io');
 const { MongoClient } = require('mongodb');
+const fs = require('fs');
+const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
@@ -331,4 +333,52 @@ const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+
+app.get('/admin/export-db', checkAuth, async (req, res) => {
+    try {
+        if (!isDbConnected) {
+            return res.status(503).json({ error: 'Database not connected' });
+        }
+
+        const data = await db.collection('runners').find({}).toArray();
+        const filePath = path.join(__dirname, 'public', 'db-dump.json');
+
+        // Write the database dump to a JSON file
+        fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+
+        res.json({ success: true, filePath: '/db-dump.json' });
+    } catch (error) {
+        console.error('Error exporting database:', error);
+        res.status(500).json({ error: 'Failed to export database' });
+    }
+});
+
+async function exportDatabase() {
+    try {
+        const response = await fetch('/admin/export-db', {
+            method: 'GET',
+            headers: getAuthHeaders()
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to export database');
+        }
+
+        const { filePath } = await response.json();
+
+        // Trigger file download
+        const link = document.createElement('a');
+        link.href = filePath;
+        link.download = 'db-dump.json';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        alert('Database exported successfully!');
+    } catch (error) {
+        console.error('Error exporting database:', error);
+        alert(error.message || 'Failed to export database');
+    }
+}
 
