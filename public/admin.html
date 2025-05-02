@@ -520,17 +520,17 @@
                             <div>
                                 <div><strong>${trackName}</strong>${sosIndicator}</div>
                                 <div class="track-summary" style="font-size: 0.9em; color: #666;">
-                                    <span class="clickable" onclick="toggleDetailedInfo(this)">
-                                        <span class="toggle-indicator">▶</span>
-                                        👤 ${track.userCount} users
-                                    </span>
-                                    ,
-                                    <span class="clickable" onclick="openRouteMap('${track._id}')">
-                                        📍 ${track.count} points
-                                    </span>
-                                    <br>
-                                    Last update: ${new Date(track.lastUpdate).toLocaleString()}
-                                </div>
+  <span class="clickable" onclick="toggleDetailedInfo(this)">
+    <span class="toggle-indicator">▶</span>
+    👤 ${track.userCount} users
+  </span>
+  ,
+  <span class="clickable" onclick="openRouteMap('${track._id}')">
+    📍 ${track.count} points
+  </span>
+  <br>
+  Last update: ${new Date(track.lastUpdate).toLocaleString()}
+</div>
                                 ${detailedInfo}
                             </div>
                                 <button class="btn btn-edit" onclick="editTrack('${track._id}')">Rename</button>
@@ -689,7 +689,8 @@
 
         function openRouteMap(trackId) {
             const iframe = document.getElementById('routeMapIframe');
-            iframe.src = '/?track=' + encodeURIComponent(trackId);
+            // Use the dedicated map page (map.html) and pass the track parameter.
+            iframe.src = '/map.html?track=' + encodeURIComponent(trackId);
             document.getElementById('routeMapModal').style.display = 'flex';
         }
 
