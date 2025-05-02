@@ -500,7 +500,11 @@
                                 <div class="track-summary" style="font-size: 0.9em; color: #666;">
                                     <span class="clickable" onclick="toggleDetailedInfo(this)">
                                         <span class="toggle-indicator">▶</span>
-                                        👤 ${track.userCount} users, 📍 ${track.count} points
+                                        👤 ${track.userCount} users
+                                    </span>
+                                    ,
+                                    <span class="clickable" onclick="openRouteMap('${track._id}')">
+                                        📍 ${track.count} points
                                     </span>
                                     <br>
                                     Last update: ${new Date(track.lastUpdate).toLocaleString()}
@@ -659,6 +663,12 @@
                     emoji.style.transform = isHidden ? 'rotate(90deg)' : 'rotate(0deg)';
                 }
             }
+        }
+
+        function openRouteMap(trackId) {
+            // Open the main map page in a new tab (or modal) with the given track ID.
+            // Adjust the URL/query parameter if necessary.
+            window.open('/?track=' + encodeURIComponent(trackId), '_blank');
         }
 
         socket.on('data_updated', loadData);
