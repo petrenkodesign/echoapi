@@ -260,6 +260,19 @@
         .btn-export:hover {
             background-color: #45a049;
         }
+
+        #routeMapModal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            align-items: center;
+            justify-content: center;
+            z-index: 3000;
+        }
     </style>
 </head>
 <body>
@@ -304,6 +317,15 @@
             <div class="modal-buttons">
                 <button class="btn" onclick="closeModal()">Cancel</button>
                 <button class="btn btn-edit" onclick="saveEdit()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="routeMapModal" class="modal">
+        <div class="modal-content" style="width: 80%; max-width: 800px; height: 80%;">
+            <iframe id="routeMapIframe" src="" style="width: 100%; height: calc(100% - 50px); border: none;"></iframe>
+            <div class="modal-buttons" style="justify-content: flex-end;">
+                <button class="btn" onclick="closeRouteMapModal()">Close</button>
             </div>
         </div>
     </div>
@@ -666,9 +688,14 @@
         }
 
         function openRouteMap(trackId) {
-            // Open the main map page in a new tab (or modal) with the given track ID.
-            // Adjust the URL/query parameter if necessary.
-            window.open('/?track=' + encodeURIComponent(trackId), '_blank');
+            const iframe = document.getElementById('routeMapIframe');
+            iframe.src = '/?track=' + encodeURIComponent(trackId);
+            document.getElementById('routeMapModal').style.display = 'flex';
+        }
+
+        function closeRouteMapModal() {
+            document.getElementById('routeMapModal').style.display = 'none';
+            document.getElementById('routeMapIframe').src = '';
         }
 
         socket.on('data_updated', loadData);
